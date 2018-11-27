@@ -349,7 +349,14 @@ const monitorCalendar = async () => {
           await loadCalendarPage();
           return;
         case "RETRY":
-          console.log("Wait & Retry");
+          notifyer.sendMessage(notifyTitle, "Retrying login.");
+          console.log("Retrying login.");
+          mailer.sendMail(
+            "WebDriver4Ext Notification",
+            "Trying to login again. ¿failed login?"
+          );
+          await goToTab(0);
+          await loadCalendarPage();
           return;
         default:
           return;
