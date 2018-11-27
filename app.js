@@ -6,9 +6,12 @@ const config = require("./config.js");
 const controls = require("./controls.js");
 const comparer = require("./comparer.js");
 const mailer = require("./mailer.js");
+const notifyer = require("./notifyer.js");
 
 var driver;
 var monitorCounter = 0;
+
+const notifyTitle = "WebDriver4Extranj";
 
 const onlyAlphanumerics = str => {
   var result = "";
@@ -60,13 +63,24 @@ const clickElement = async (
   }
 };
 
-const selectItemByText = async (element, itemText, onlyAlpha = false) => {
+const selectItemByText = async (
+  element,
+  itemText,
+  onlyAlpha = false,
+  waitForEnabled = true
+) => {
   var result = {
     status: "ERROR",
     reason: ""
   };
 
   try {
+    if (waitForEnabled)
+      await driver.wait(
+        until.elementIsEnabled(driver.findElement(element)),
+        config.timeoutWait
+      );
+
     var dropdown_list = await driver.findElement(element);
     if (dropdown_list) {
       var options = await dropdown_list.findElements(By.tagName("option"));
@@ -104,6 +118,7 @@ const selectItemByText = async (element, itemText, onlyAlpha = false) => {
 initialize = async () => {
   //Initialazing WebDriver
   console.log("Initializing webdriver");
+  notifyer.sendMessage(notifyTitle, "Initializing webdriver");
   if (!config.useHeadlessBrowser) {
     driver = await new Builder().forBrowser(config.browser).build();
   } else {
@@ -124,6 +139,7 @@ initialize = async () => {
 loadCalendarPage = async () => {
   try {
     //Open calendar page
+    notifyer.sendMessage(notifyTitle, "Initializing Login");
     await driver.get(config.url);
 
     /** Step 1: Login **/
@@ -202,6 +218,7 @@ const extractData = async () => {
     data: ""
   };
   console.log("Init extractData");
+  notifyer.sendMessage(notifyTitle, "Data extraction in process");
   try {
     var source = await driver.getPageSource();
     if (source) {
@@ -239,6 +256,7 @@ const tabsCount = async () => {
 
 const loadDataPage = async () => {
   try {
+    extractData;
     if ((await tabsCount()) === 1) await driver.executeScript("window.open()");
     await goToTab(1); //switches to new tab
     await driver.get(config.urlData);
@@ -284,6 +302,10 @@ const monitorCalendar = async () => {
           switch (resultComp) {
             case "ERROR":
               console.log("Error in comparation");
+              notifyer.sendMessage(
+                notifyTitle,
+                "Something went wrong in file comparison."
+              );
               mailer.sendMail(
                 "WebDriver4Ext Notification",
                 "Something went wrong in file comparison. Come with me, let's fix it."
@@ -291,9 +313,14 @@ const monitorCalendar = async () => {
               return;
             case "EQUAL":
               console.log("Equal data. Nothing to do");
+              notifyer.sendMessage(notifyTitle, "Equal data. Nothing to do.");
               return;
             case "DIFFERENT":
               console.log("Data has changed. Notify quickly");
+              notifyer.sendMessage(
+                notifyTitle,
+                "Data has changed. Attend quickly!!!"
+              );
               mailer.sendMail(
                 "WebDriver4Ext Notification",
                 "Data has changed. Hurry up aka Move your ass."
@@ -301,6 +328,7 @@ const monitorCalendar = async () => {
               return;
             case "FIRST":
               console.log("");
+              notifyer.sendMessage(notifyTitle, "Initial Data File created.");
               mailer.sendMail(
                 "WebDriver4Ext Notification",
                 "Initial Data File created."
@@ -311,6 +339,7 @@ const monitorCalendar = async () => {
           }
           return;
         case "LOGIN":
+          notifyer.sendMessage(notifyTitle, "Trying to login again.");
           console.log("Need to login again");
           mailer.sendMail(
             "WebDriver4Ext Notification",
@@ -328,6 +357,7 @@ const monitorCalendar = async () => {
     }
   } catch (err) {
     console.log(`Error in monitorCalendar: ${err.message}`);
+    notifyer.sendMessage(notifyTitle, "Help! Exception in monitorCalendar(). ");
     mailer.sendMail(
       "WebDriver4Ext Notification",
       "Help! Exception in monitorCalendar(). " + err.message
