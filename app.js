@@ -1,11 +1,14 @@
 const { Builder, By, Key, until, Point } = require("selenium-webdriver");
+const chrome = require("selenium-webdriver/chrome");
 const h2p = require("html2plaintext");
 const fs = require("fs");
 const config = require("./config.js");
 const controls = require("./controls.js");
 const comparer = require("./comparer.js");
+const mailer = require("./mailer.js");
 
 var driver;
+var monitorCounter = 0;
 
 const onlyAlphanumerics = str => {
   var result = "";
@@ -98,19 +101,30 @@ const selectItemByText = async (element, itemText, onlyAlpha = false) => {
   }
 };
 
-init = async () => {
-  //(async function example() {
-  try {
-    //Init driver
+initialize = async () => {
+  //Initialazing WebDriver
+  console.log("Initializing webdriver");
+  if (!config.useHeadlessBrowser) {
     driver = await new Builder().forBrowser(config.browser).build();
+  } else {
+    driver = new Builder()
+      .forBrowser(config.browser)
+      .setChromeOptions("headless")
+      //.setFirefoxOptions(/* ... */)
+      .build();
+  }
 
-    //Open page
+  //Maximize browser window
+  await driver
+    .manage()
+    .window()
+    .maximize();
+};
+
+loadCalendarPage = async () => {
+  try {
+    //Open calendar page
     await driver.get(config.url);
-    //Maximize window
-    await driver
-      .manage()
-      .window()
-      .maximize();
 
     /** Step 1: Login **/
     console.log("Init Login");
@@ -169,53 +183,18 @@ init = async () => {
     await driver.sleep(config.longWait); //Explicit wait for modal loading
     await clickElement(controls.btnCloseModalStep6);
     //End dismiss user data modal
-
-    /** Open Data Page in another tab **/
-    await driver.sleep(config.longWait); //Explicit wait for page loading
-    if (await openDataPage()) {
-      var res = await extractData();
-      switch (res.status) {
-        case "ERROR":
-          console.log(`Error: ${res.data}`);
-          return;
-        case "OK":
-          console.log("Keep going baby =>");
-          //console.log(res.data);
-          resultComp = await comparer.compareData(res.data);
-          switch (resultComp) {
-            case "ERROR":
-              console.log("Error in comparation");
-              return;
-            case "EQUAL":
-              console.log("Equal data. Nothing to do");
-              return;
-            case "DIFFERENT":
-              console.log("Data has changed. Notify quickly");
-              return;
-            case "FIRST":
-              console.log("Initial File created");
-              return;
-            default:
-              return;
-          }
-          return;
-        case "LOGIN":
-          console.log("Go back");
-          return;
-        case "RETRY":
-          console.log("Wait & Retry");
-          return;
-        default:
-          return;
-      }
-    }
+    return true;
   } catch (error) {
     console.log(error);
+    mailer.sendMail(
+      "WebDriver4Ext Notification",
+      "Help! Exception in loadCalendarPage(). " + err.message
+    );
+    return false;
   } finally {
     //await driver.quit();
   }
 };
-//})();
 
 const extractData = async () => {
   var result = {
@@ -253,10 +232,14 @@ const extractData = async () => {
   }
 };
 
-const openDataPage = async () => {
-  console.log("Init openDataPage");
+const tabsCount = async () => {
+  var tabs = await driver.getAllWindowHandles();
+  return tabs.length;
+};
+
+const loadDataPage = async () => {
   try {
-    await driver.executeScript("window.open()");
+    if ((await tabsCount()) === 1) await driver.executeScript("window.open()");
     await goToTab(1); //switches to new tab
     await driver.get(config.urlData);
     return true;
@@ -267,7 +250,7 @@ const openDataPage = async () => {
 };
 
 const goToTab = async tabIdx => {
-  console.log("Init goToTab");
+  console.log(`goToTab ${tabIdx}`);
   try {
     var tabs = await driver.getAllWindowHandles();
     if (tabs.length >= tabIdx + 1) {
@@ -285,4 +268,81 @@ const refreshPage = async () => {
   await driver.navigate().refresh();
 };
 
-init();
+const monitorCalendar = async () => {
+  monitorCounter++;
+  console.log(`Monitor running for ${monitorCounter} time`);
+  try {
+    if (await loadDataPage()) {
+      var res = await extractData();
+      switch (res.status) {
+        case "ERROR":
+          console.log(`Error: ${res.data}`);
+          return;
+        case "OK":
+          console.log("Keep going baby =>");
+          resultComp = await comparer.compareData(res.data);
+          switch (resultComp) {
+            case "ERROR":
+              console.log("Error in comparation");
+              mailer.sendMail(
+                "WebDriver4Ext Notification",
+                "Something went wrong in file comparison. Come with me, let's fix it."
+              );
+              return;
+            case "EQUAL":
+              console.log("Equal data. Nothing to do");
+              return;
+            case "DIFFERENT":
+              console.log("Data has changed. Notify quickly");
+              mailer.sendMail(
+                "WebDriver4Ext Notification",
+                "Data has changed. Hurry up aka Move your ass."
+              );
+              return;
+            case "FIRST":
+              console.log("");
+              mailer.sendMail(
+                "WebDriver4Ext Notification",
+                "Initial Data File created."
+              );
+              return;
+            default:
+              return;
+          }
+          return;
+        case "LOGIN":
+          console.log("Need to login again");
+          mailer.sendMail(
+            "WebDriver4Ext Notification",
+            "Trying to login again."
+          );
+          await goToTab(0);
+          await loadCalendarPage();
+          return;
+        case "RETRY":
+          console.log("Wait & Retry");
+          return;
+        default:
+          return;
+      }
+    }
+  } catch (err) {
+    console.log(`Error in monitorCalendar: ${err.message}`);
+    mailer.sendMail(
+      "WebDriver4Ext Notification",
+      "Help! Exception in monitorCalendar(). " + err.message
+    );
+  } finally {
+  }
+};
+
+const main = async () => {
+  await initialize();
+  await loadCalendarPage();
+  await driver.sleep(config.longWait); //Explicit wait for page loading
+  await monitorCalendar(); //First run, without dealy
+  //schedule monitor
+  var timer = setInterval(monitorCalendar, config.monitorInterval);
+};
+
+main();

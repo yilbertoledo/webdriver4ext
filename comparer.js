@@ -12,15 +12,15 @@ const compareData = async jsonData => {
       var previousData = JSON.parse(dataStr);
       if (dataStr.toString() === JSON.stringify(jsonData)) {
         // if (jsonData === previousData) {
-        console.log("Equal data");
+        //console.log("Equal data");
         result = "EQUAL";
       } else {
-        console.log("Different data");
+        //console.log("Different data");
         await saveData(jsonData, newFilename);
         result = "DIFFERENT";
       }
     } else {
-      console.log("Cannot get last file");
+      //console.log("Cannot get last file");
       await saveData(jsonData, newFilename);
       result = "FIRST";
     }
@@ -65,12 +65,9 @@ const getLastFile = dir => {
     }
     var files = fs.readdirSync(dir);
     if (files && files.length > 0) {
-      console.log("fu:" + files);
       files.sort(sortStringArrayDes);
-      console.log(files[0]);
       return files[0];
     } else {
-      console.log("6");
       return "";
     }
   } catch (err) {
