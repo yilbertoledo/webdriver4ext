@@ -1,7 +1,7 @@
 const { Builder, By, Key, until } = require("selenium-webdriver");
 const axios = require("axios");
-const config = require("./config.js");
-const controls = require("./controls.js");
+const config = require("../config.js");
+const controls = require("../controls.js");
 
 var driver;
 
@@ -63,9 +63,7 @@ const selectItemByText = async (element, itemText, onlyAlpha = false) => {
     //Init driver
     driver = await new Builder().forBrowser(config.browser).build();
     //Open page
-    await driver.get(
-      "file:///home/yet88/Develop/Node.js/Projects/selenium-extranjeria/test1.html"
-    );
+    await driver.get(`file://${__dirname}/test1.html`);
 
     await driver
       .manage()
@@ -117,9 +115,7 @@ const openDataPage = async () => {
   var tabs = await driver.getAllWindowHandles();
   console.log(tabs);
   await driver.switchTo().window(tabs[1]); //switches to new tab
-  await driver.get(
-    "file:///home/yet88/Develop/Node.js/Projects/selenium-extranjeria/test2.html"
-  );
+  await driver.get(`file://${__dirname}/test2.html`);
 
   var ok = false;
   ok = await goToTab(0);
