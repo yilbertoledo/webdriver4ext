@@ -19,6 +19,8 @@ controls = {
   RdBtnNoStep5: By.id("opcionRadio2"),
   btnNextStep5: By.id("btnSiguienteRB"),
   btnCloseModalStep6: By.xpath("/html/body/div[4]/div[3]/div/button[2]"),
+  lnkLogout: By.className("rh-logout"),
 };
 
 module.exports = controls;
+

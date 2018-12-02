@@ -8,6 +8,15 @@ const comparer = require("./comparer.js");
 const mailer = require("./mailer.js");
 const notifyer = require("./notifyer.js");
 
+
+const STEP1_LOGIN = 1;
+const STEP2_MAIN_OPERATION = 2;
+const STEP3_NEW_PROCEDURE = 3;
+const STEP4_GENERAL_BACKGROUND = 4;
+const STEP5_REQUIEREMENTS_COMPLIANCE = 5;
+const STEP6_PERSONAL_INFO = 6;
+const STEP7_CALENDAR = 7;
+
 var driver;
 var monitorCounter = 0;
 
@@ -55,10 +64,10 @@ const clickElement = async (
       result.reason = "Element not found.";
     }
   } catch (error) {
-    console.log(error);
+    log(error);
     result.reason = error.message;
   } finally {
-    console.log(`Click ${result.status}: ${result.reason}`);
+    log(`Click ${result.status}: ${result.reason}`);
     return result;
   }
 };
@@ -107,18 +116,17 @@ const selectItemByText = async (
       result.reason = "Control not found.";
     }
   } catch (error) {
-    console.log(error);
+    log(error);
     result.reason = error.message;
   } finally {
-    console.log(`Selection ${result.status}: ${result.reason}`);
+    log(`Selection ${result.status}: ${result.reason}`);
     return result;
   }
 };
 
 initialize = async () => {
   //Initialazing WebDriver
-  console.log("Initializing webdriver");
-  notifyer.sendMessage(notifyTitle, "Initializing webdriver");
+  log("Initializing webdriver", false, true);
   if (!config.useHeadlessBrowser) {
     driver = await new Builder().forBrowser(config.browser).build();
   } else {
@@ -136,76 +144,87 @@ initialize = async () => {
     .maximize();
 };
 
-loadCalendarPage = async () => {
+loadCalendarPage = async (initialStep) => {
   try {
-    //Open calendar page
-    notifyer.sendMessage(notifyTitle, "Initializing Login");
-    await driver.get(config.url);
 
-    /** Step 1: Login **/
-    console.log("Init Login");
-    await driver
-      .findElement(controls.txtUsername)
-      .sendKeys(config.username, Key.TAB, config.password, Key.RETURN);
-    /** End Login **/
+    if (!initialStep)
+      initialStep = STEP1_LOGIN
 
-    /** Step 2: Operation selection **/
-    console.log("Init Operation Selection");
-    await driver.sleep(config.shortWait); //Explicit wait for page loading
-    await clickElement(controls.btnReservarHora);
-    /** End Operation selection **/
-
-    /** Step 3: Transaction selection **/
-    console.log("Init Transaction Selection");
-    //Begin dismiss info modal
-    await driver.sleep(config.longWait); //Explicit wait for modal loading
-    await clickElement(controls.btnCloseModalStep3);
-    //End dismiss info modal
-    //Begin Procedure selection
-    let region = config.location.split(":")[0];
-    let comune = config.location.split(":")[1];
-    var resultStep3 = await selectItemByText(controls.cmbRegiones, region);
-    if (resultStep3.status === "OK")
-      resultStep3 = await selectItemByText(controls.cmbComunas, comune);
-    if (resultStep3.status === "OK") {
-      resultStep3 = await selectItemByText(
-        controls.cmbTramites,
-        config.procedureName,
-        true
-      );
+    if (initialStep <= STEP1_LOGIN) {
+      log("Initializing Login", false, true);
+      //Open calendar page
+      await driver.get(config.url);
+      /** Step 1: Login **/
+      await driver
+        .findElement(controls.txtUsername)
+        .sendKeys(config.username, Key.TAB, config.password, Key.RETURN);
+      /** End Login **/
     }
-    if (resultStep3.status === "OK") {
-      resultStep3 = await clickElement(controls.btnNextStep3, false, true);
+
+    if (initialStep <= STEP2_MAIN_OPERATION) {
+      /** Step 2: Operation selection **/
+      log("Init Operation Selection");
+      await driver.sleep(config.shortWait); //Explicit wait for page loading
+      await clickElement(controls.btnReservarHora);
+      /** End Operation selection **/
     }
-    //Begin Procedure selection
-    /** End Transaction selection **/
 
-    /** Step 4: Informative general background  **/
-    console.log("Init Informative general background");
-    await driver.sleep(config.longWait); //Explicit wait for page loading
-    let result = await clickElement(controls.btnNextStep4, true, false);
-    /** End Informative general background  **/
+    if (initialStep <= STEP3_NEW_PROCEDURE) {
+      /** Step 3: Transaction selection **/
+      log("Init Transaction Selection");
+      //Begin dismiss info modal
+      await driver.sleep(config.longWait); //Explicit wait for modal loading
+      await clickElement(controls.btnCloseModalStep3);
+      //End dismiss info modal
+      //Begin Procedure selection
+      let region = config.location.split(":")[0];
+      let comune = config.location.split(":")[1];
+      var resultStep3 = await selectItemByText(controls.cmbRegiones, region);
+      if (resultStep3.status === "OK")
+        resultStep3 = await selectItemByText(controls.cmbComunas, comune);
+      if (resultStep3.status === "OK") {
+        resultStep3 = await selectItemByText(
+          controls.cmbTramites,
+          config.procedureName,
+          true
+        );
+      }
+      if (resultStep3.status === "OK") {
+        resultStep3 = await clickElement(controls.btnNextStep3, false, true);
+      }
+      //Begin Procedure selection
+      /** End Transaction selection **/
+    }
 
-    /** Step 5: Requirement compliance **/
-    await driver.sleep(config.longWait); //Explicit wait for page loading
-    var resultStep5 = await clickElement(controls.RdBtnYesStep5);
-    if (resultStep5.status === "OK")
-      resultStep5 = await clickElement(controls.btnNextStep5);
-    /** End Requirement compliance  **/
+    if (initialStep <= STEP4_GENERAL_BACKGROUND) {
+      /** Step 4: Informative general background  **/
+      log("Init Informative general background");
+      await driver.sleep(config.longWait); //Explicit wait for page loading
+      let result = await clickElement(controls.btnNextStep4, true, false);
+      /** End Informative general background  **/
+    }
 
-    /** Step 6: Transaction selection **/
-    console.log("Init Transaction Selection");
-    //Begin dismiss user data modal
-    await driver.sleep(config.longWait); //Explicit wait for modal loading
-    await clickElement(controls.btnCloseModalStep6);
-    //End dismiss user data modal
+    if (initialStep <= STEP5_REQUIEREMENTS_COMPLIANCE) {
+      /** Step 5: Requirement compliance **/
+      await driver.sleep(config.longWait); //Explicit wait for page loading
+      var resultStep5 = await clickElement(controls.RdBtnYesStep5);
+      if (resultStep5.status === "OK")
+        resultStep5 = await clickElement(controls.btnNextStep5);
+      /** End Requirement compliance  **/
+    }
+
+    if (initialStep <= STEP6_PERSONAL_INFO) {
+      /** Step 6: Transaction selection **/
+      log("Init Transaction Selection");
+      //Begin dismiss user data modal
+      await driver.sleep(config.longWait); //Explicit wait for modal loading
+      await clickElement(controls.btnCloseModalStep6);
+      //End dismiss user data modal
+    }
+
     return true;
   } catch (error) {
-    console.log(error);
-    mailer.sendMail(
-      "WebDriver4Ext Notification",
-      "Help! Exception in loadCalendarPage(). " + err.message
-    );
+    log("Help! Exception in loadCalendarPage(). " + err.message, true, false);
     return false;
   } finally {
     //await driver.quit();
@@ -217,8 +236,7 @@ const extractData = async () => {
     status: "",
     data: ""
   };
-  console.log("Init extractData");
-  notifyer.sendMessage(notifyTitle, "Data extraction in process");
+  log("Data extraction in process", false, true);
   try {
     var source = await driver.getPageSource();
     if (source) {
@@ -262,13 +280,13 @@ const loadDataPage = async () => {
     await driver.get(config.urlData);
     return true;
   } catch (error) {
-    console.log(error);
+    log(error);
     return false;
   }
 };
 
 const goToTab = async tabIdx => {
-  console.log(`goToTab ${tabIdx}`);
+  log(`goToTab ${tabIdx}`);
   try {
     var tabs = await driver.getAllWindowHandles();
     if (tabs.length >= tabIdx + 1) {
@@ -276,99 +294,93 @@ const goToTab = async tabIdx => {
       return true;
     }
   } catch (error) {
-    console.log(error);
+    log(error);
     return false;
   }
 };
 
 const refreshPage = async () => {
-  console.log("Init refreshPage");
+  log("Init refreshPage");
   await driver.navigate().refresh();
 };
 
+const logout = async () => {
+  await clickElement(controls.lnkLogout);
+  con
+  rh - logout
+}
+
+const log = async (message, email = false, desktop = false) => {
+  console.log(message);
+  if (desktop)
+    notifyer.sendMessage(
+      notifyTitle,
+      message,
+    );
+  if (email)
+    mailer.sendMail(
+      notifyTitle,
+      message
+    );
+}
+
 const monitorCalendar = async () => {
   monitorCounter++;
-  console.log(`Monitor running for ${monitorCounter} time`);
+  log(`Monitor running for ${monitorCounter} time`);
   try {
     if (await loadDataPage()) {
       var res = await extractData();
       switch (res.status) {
         case "ERROR":
-          console.log(`Error: ${res.data}`);
+          log(`Error: ${res.data}`);
           return;
         case "OK":
-          console.log("Keep going baby =>");
+          log("Keep going baby =>");
           resultComp = await comparer.compareData(res.data);
           switch (resultComp) {
             case "ERROR":
-              console.log("Error in comparation");
-              notifyer.sendMessage(
-                notifyTitle,
-                "Something went wrong in file comparison."
-              );
-              mailer.sendMail(
-                "WebDriver4Ext Notification",
-                "Something went wrong in file comparison. Come with me, let's fix it."
-              );
+              log("Something went wrong in file comparison. Come with me, let's fix it.", true, true);
               return;
             case "EQUAL":
-              console.log("Equal data. Nothing to do");
-              notifyer.sendMessage(notifyTitle, "Equal data. Nothing to do.");
+              log("Equal data. Nothing to do", false, true);
               return;
             case "DIFFERENT":
-              console.log("Data has changed. Notify quickly");
-              notifyer.sendMessage(
-                notifyTitle,
-                "Data has changed. Attend quickly!!!"
-              );
-              mailer.sendMail(
-                "WebDriver4Ext Notification",
-                "Data has changed. Hurry up aka Move your ass."
-              );
+              log("Data has changed. Hurry up aka Move your ass!!", true, true);
               return;
             case "FIRST":
-              console.log("");
-              notifyer.sendMessage(notifyTitle, "Initial Data File created.");
-              mailer.sendMail(
-                "WebDriver4Ext Notification",
-                "Initial Data File created."
-              );
+              log("Initial Data File created.", true, true);
               return;
             default:
               return;
           }
           return;
         case "LOGIN":
-          notifyer.sendMessage(notifyTitle, "Trying to login again.");
-          console.log("Need to login again");
-          mailer.sendMail(
-            "WebDriver4Ext Notification",
-            "Trying to login again."
-          );
+          log("Trying to login again.", true, false);
           await goToTab(0);
-          await loadCalendarPage();
+          await loadCalendarPage(STEP1_LOGIN);
           return;
         case "RETRY":
-          notifyer.sendMessage(notifyTitle, "Retrying login.");
-          console.log("Retrying login.");
-          mailer.sendMail(
-            "WebDriver4Ext Notification",
-            "Trying to login again. ¿failed login?"
-          );
+          log("Retrying login.", true, true);
           await goToTab(0);
-          await loadCalendarPage();
+          var btnNextStep5 = await driver.findElement(controls.btnNextStep5);
+          if (btnNextStep5) {
+            log("Bug has bite us!! Retrying login from STEP 5.", true, true);
+            //There is a bug that shows a validation error waiting for RadioButton
+            //Then we need to retry from Step 5
+            await loadCalendarPage(STEP5_REQUIEREMENTS_COMPLIANCE)
+          }
+          else {
+            //Maybe we should start over :(
+            log("Abort mission, step back and realign!");
+            await logout();
+          }
           return;
         default:
           return;
       }
     }
   } catch (err) {
-    console.log(`Error in monitorCalendar: ${err.message}`);
-    notifyer.sendMessage(notifyTitle, "Help! Exception in monitorCalendar(). ");
-    mailer.sendMail(
-      "WebDriver4Ext Notification",
-      "Help! Exception in monitorCalendar(). " + err.message
-    );
+    log(`Help! Exception in monitorCalendar(): ${err.message}`, true, true);
   } finally {
   }
 };
